@@ -32,17 +32,23 @@ class Source:
         sets="".join(f"<setSpec>{s}</setSpec>" for s in row["sets"])
         h=f'<header{chr(32)+"status="+chr(34)+"deleted"+chr(34) if row["deleted"] else ""}><identifier>{row["id"]}</identifier><datestamp>{row["stamp"]}</datestamp>{sets}</header>'
         if header_only:return h
-        metadata="" if row["deleted"] else f'<metadata><description xmlns="urn:campus:{fmt}"><title>{row["title"]}</title><level>{"完整研究" if fmt=="research" else "简略书目"}</level></description></metadata>'
+        if row["deleted"]:metadata=""
+        elif fmt=="oai_dc":
+            metadata=f'<metadata><oai_dc:dc xmlns:oai_dc="http://www.openarchives.org/OAI/2.0/oai_dc/" xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>{row["title"]}</dc:title><dc:identifier>{row["id"]}</dc:identifier></oai_dc:dc></metadata>'
+        else:metadata=f'<metadata><description xmlns="urn:campus:research"><title>{row["title"]}</title><level>完整研究</level></description></metadata>' 
         return "<record>"+h+metadata+"</record>"
     def route(self,method,path,q,headers,body):
+        if path=="/research.xsd":
+            return 200,{"Content-Type":"application/xml"},'<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" targetNamespace="urn:campus:research" elementFormDefault="qualified"><xs:element name="description"><xs:complexType><xs:sequence><xs:element name="title" type="xs:string"/><xs:element name="level" type="xs:string"/></xs:sequence></xs:complexType></xs:element></xs:schema>'
         if path!="/oai":return 404,{},b""
         verb=q.get("verb","")
         if verb=="Identify":
-            return xml("<Identify><repositoryName>校园成果库</repositoryName><baseURL>/oai</baseURL><protocolVersion>2.0</protocolVersion><adminEmail>library@example.invalid</adminEmail><earliestDatestamp>2026-11-16T10:00:00Z</earliestDatestamp><deletedRecord>persistent</deletedRecord><granularity>YYYY-MM-DDThh:mm:ssZ</granularity></Identify>")
+            return xml("<Identify><repositoryName>校园成果库</repositoryName><baseURL>BASE_URL</baseURL><protocolVersion>2.0</protocolVersion><adminEmail>library@example.invalid</adminEmail><earliestDatestamp>2026-11-16T10:00:00Z</earliestDatestamp><deletedRecord>persistent</deletedRecord><granularity>YYYY-MM-DDThh:mm:ssZ</granularity></Identify>".replace("BASE_URL",self.base+"/oai"))
         if verb=="ListSets":
             return xml("<ListSets><set><setSpec>teaching</setSpec><setName>教学创新</setName></set><set><setSpec>industry</setSpec><setName>产业实践</setName></set></ListSets>")
         if verb=="ListMetadataFormats":
-            return xml("<ListMetadataFormats>"+ "".join(f"<metadataFormat><metadataPrefix>{f}</metadataPrefix><schema>urn:campus:{f}</schema><metadataNamespace>urn:campus:{f}</metadataNamespace></metadataFormat>" for f in ["oai_dc","research"])+"</ListMetadataFormats>")
+            formats=[("oai_dc","http://www.openarchives.org/OAI/2.0/oai_dc.xsd","http://www.openarchives.org/OAI/2.0/oai_dc/"),("research",self.base+"/research.xsd","urn:campus:research")]
+            return xml("<ListMetadataFormats>"+"".join(f"<metadataFormat><metadataPrefix>{f}</metadataPrefix><schema>{schema}</schema><metadataNamespace>{ns}</metadataNamespace></metadataFormat>" for f,schema,ns in formats)+"</ListMetadataFormats>")
         if verb not in ["ListRecords","ListIdentifiers","GetRecord"]:return error("badVerb","不支持的动词")
         if "resumptionToken" in q:
             if set(q)!={"verb","resumptionToken"}:return error("badArgument","续页不能混入原查询")

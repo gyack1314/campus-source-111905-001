@@ -36,3 +36,9 @@ class Contract(SourceCase):
         self.assertEqual(self.tree("verb=ListRecords&resumptionToken="+token).find("o:error",NS).get("code"),"badResumptionToken")
     def test_empty_is_protocol_fact(self):
         self.assertEqual(self.tree("verb=ListRecords&metadataPrefix=research&set=absent").find("o:error",NS).get("code"),"noRecordsMatch")
+
+    def test_standard_dc_and_local_schema(self):
+        t=self.tree("verb=GetRecord&metadataPrefix=oai_dc&identifier=oai:campus:p1")
+        self.assertIsNotNone(t.find(".//{http://purl.org/dc/elements/1.1/}title"))
+        s,h,b=self.request("/research.xsd");self.assertEqual(s,200)
+        self.assertEqual(E.fromstring(b).get("targetNamespace"),"urn:campus:research")
