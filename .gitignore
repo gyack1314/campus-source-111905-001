@@ -1,3 +1,7 @@
 __pycache__/
 *.pyc
 .venv/
+harvest-state/
+*.sqlite3
+*.sqlite3-wal
+*.sqlite3-shm
